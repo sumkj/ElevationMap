@@ -198,7 +198,8 @@ function buildMesh(terrain, nRows, nCols) {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geo.setAttribute('color',    new THREE.BufferAttribute(colors,    3));
-    geo.setIndex(indexArr);
+    // Uint32Array を明示：頂点数が65536を超えるため必須
+    geo.setIndex(new THREE.BufferAttribute(new Uint32Array(indexArr), 1));
     geo.computeVertexNormals();
 
     const mat = new THREE.MeshPhongMaterial({
@@ -265,7 +266,11 @@ function toggleGuide() {
     b.textContent   = hidden ? 'ガイドを隠す' : 'ガイドを表示';
 }
 
-init().catch(console.error);
+init().catch(err => {
+    console.error(err);
+    document.getElementById('loading-msg').textContent =
+        'エラー: ' + err.message + ' — CSVファイルを確認してください';
+});
 </script>
 </body>
 </html>
