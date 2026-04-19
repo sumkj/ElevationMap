@@ -93,10 +93,9 @@
 </div>
 <button id="btn-guide" onclick="toggleGuide()">ガイドを隠す</button>
 
-<!-- 反転ボタン -->
+<!-- 回転ボタン -->
 <div id="flip-btns">
-    <button class="flip-btn" onclick="flipLR()">⇔ 左右反転</button>
-    <button class="flip-btn" onclick="flipUD()">⇕ 上下反転</button>
+    <button class="flip-btn" onclick="rotate180()">&#128260; 180°回転</button>
 </div>
 
 <script>
@@ -278,22 +277,15 @@ window.addEventListener('resize', () => {
     renderer.setSize(innerWidth, innerHeight);
 });
 
-// ---- 左右反転（Z軸まわりに180°回転）----
-function flipLR() {
+// ---- 地形表示を180°回転----
+// カメラのX/Y座標をターゲット基準で反転 → 水平180°回転
+function rotate180() {
     const tx = controls.target.x;
     const ty = controls.target.y;
     const dx = camera.position.x - tx;
     const dy = camera.position.y - ty;
     camera.position.x = tx - dx;
     camera.position.y = ty - dy;
-    controls.update();
-}
-
-// ---- 上下反転（Z成分を対称移動）----
-function flipUD() {
-    const tz = controls.target.z;
-    const dz = camera.position.z - tz;
-    camera.position.z = tz - dz;
     controls.update();
 }
 
