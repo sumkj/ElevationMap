@@ -1,95 +1,271 @@
 <!DOCTYPE html>
-<!-- HTML
-     ElevationMap_p5js
-     国土地理院標高データ 3D地形ビューア（p5.js WEBGL版）
-     Version: 1.1.0
+<!-- HTML / JavaScript (Three.js)
+     ElevationMap_threejs
+     国土地理院標高データ 3D地形ビューア（Three.js BufferGeometry版）
+     Version: 2.0.0
+     データ: https://cyberjapandata.gsi.go.jp/xyz/dem/
 -->
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>国土地理院 標高地形ビューア — p5.js WEBGL</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <title>国土地理院 標高地形ビューア</title>
+
+    <!-- Three.js r128（script tag対応版） -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #111; overflow: hidden; touch-action: none; }
-        canvas { display: block; }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#111; overflow:hidden; }
 
         /* ローディング画面 */
-        #loading-screen {
-            position: fixed; top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: #0a0a0a;
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            z-index: 100; font-family: monospace; color: #00BFFF;
+        #loading {
+            position:fixed; top:0; left:0; width:100%; height:100%;
+            background:#0a0a1a;
+            display:flex; flex-direction:column;
+            align-items:center; justify-content:center;
+            z-index:100; font-family:monospace; color:#00BFFF;
+            transition: opacity 0.5s;
         }
-        #loading-screen h2 { font-size: 1.4rem; margin-bottom: 20px; letter-spacing: 0.15em; }
-        .progress-bar { width: 300px; height: 4px; background: #222; border-radius: 2px; overflow: hidden; }
-        .progress-fill { height: 100%; background: linear-gradient(90deg, #00BFFF, #0080FF);
-                         animation: bar 1.8s ease-in-out infinite; }
+        #loading h2  { font-size:1.4rem; letter-spacing:.15em; margin-bottom:20px; }
+        #loading-msg { font-size:.85rem; color:#4488aa; margin-top:12px; }
+        .bar { width:280px; height:5px; background:#1a1a2e; border-radius:3px; overflow:hidden; }
+        .bar-fill { height:100%; background:linear-gradient(90deg,#00BFFF,#0055ff);
+                    animation:bar 1.6s ease-in-out infinite; }
         @keyframes bar {
-            0%   { width:0%;  margin-left:0%; }
-            50%  { width:60%; margin-left:20%; }
-            100% { width:0%;  margin-left:100%; }
+            0%  { width:0%;  margin-left:0%; }
+            50% { width:60%; margin-left:20%; }
+            100%{ width:0%;  margin-left:100%; }
         }
-        #loading-msg { margin-top: 14px; font-size: 0.8rem; color: #4488aa; }
 
-        /* 操作ガイド（HTMLオーバーレイ） */
+        /* 操作ガイド */
         #guide {
-            position: fixed; top: 14px; left: 14px;
-            background: rgba(0,0,0,0.65);
-            color: #fff; font-family: monospace; font-size: 13px;
-            padding: 12px 16px; border-radius: 8px;
-            border: 1px solid rgba(255,255,255,0.15);
-            line-height: 1.9;
-            pointer-events: none;
-            z-index: 10;
+            position:fixed; top:14px; left:14px;
+            background:rgba(0,0,0,.65); color:#eee;
+            font-family:monospace; font-size:13px;
+            padding:12px 16px; border-radius:8px;
+            border:1px solid rgba(255,255,255,.15);
+            line-height:2; pointer-events:none; z-index:10;
         }
-        #guide-toggle {
-            position: fixed; top: 14px; right: 14px;
-            background: rgba(0,0,0,0.6);
-            color: #aaa; font-family: monospace; font-size: 12px;
-            padding: 6px 12px; border-radius: 6px;
-            border: 1px solid rgba(255,255,255,0.2);
-            cursor: pointer; z-index: 10;
+        #btn-guide {
+            position:fixed; top:14px; right:14px;
+            background:rgba(0,0,0,.6); color:#aaa;
+            font-family:monospace; font-size:12px;
+            padding:7px 14px; border-radius:6px;
+            border:1px solid rgba(255,255,255,.2);
+            cursor:pointer; z-index:10;
         }
-        #guide-toggle:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        #btn-guide:hover { background:rgba(255,255,255,.12); color:#fff; }
     </style>
 </head>
 <body>
 
 <!-- ローディング -->
-<div id="loading-screen">
+<div id="loading">
     <h2>📡 標高データ読み込み中...</h2>
-    <div class="progress-bar"><div class="progress-fill"></div></div>
+    <div class="bar"><div class="bar-fill"></div></div>
     <div id="loading-msg">国土地理院 GSI DEM データを解析中</div>
 </div>
 
-<!-- 操作ガイド -->
+<!-- ガイド -->
 <div id="guide">
     【操作ガイド】<br>
-    ドラッグ　　: 視点を回転<br>
-    右ドラッグ　: 平行移動<br>
-    スクロール　: ズーム<br>
-    ピンチ(タッチ): ズーム
+    ドラッグ　　　: 視点を回転<br>
+    右ドラッグ　　: 平行移動<br>
+    スクロール　　: ズーム<br>
+    ピンチ(2本指) : ズーム
 </div>
-<button id="guide-toggle" onclick="toggleGuide()">ガイドを隠す</button>
+<button id="btn-guide" onclick="toggleGuide()">ガイドを隠す</button>
 
 <script>
-function toggleGuide() {
-    const g = document.getElementById('guide');
-    const b = document.getElementById('guide-toggle');
-    if (g.style.display === 'none') {
-        g.style.display = 'block';
-        b.textContent = 'ガイドを隠す';
+// =============================================
+// Three.js 標高地形ビューア
+// =============================================
+const STRIDE = 3;   // データ間引き（3=1/9のデータ量）
+const SCL    = 2.7; // 水平スケール（STRIDE分を補正）
+const ZSCL   = 5.0; // 標高の縦倍率
+
+let scene, camera, renderer, controls;
+
+async function init() {
+    // --- Three.js セットアップ ---
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xd0dce8);
+    scene.fog = new THREE.FogExp2(0xd0dce8, 0.0005);
+
+    camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 1, 50000);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(devicePixelRatio);
+    document.body.appendChild(renderer.domElement);
+
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor  = 0.06;
+    controls.screenSpacePanning = true;
+
+    // ライティング
+    scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+    const sun = new THREE.DirectionalLight(0xfff5e0, 0.75);
+    sun.position.set(1, -2, 3);
+    scene.add(sun);
+
+    // --- CSVロード（非同期で UIをブロックしない） ---
+    setMsg('CSVファイルを読み込み中...');
+    const res  = await fetch('data/15_allzz28962-9.csv');
+    const text = await res.text();
+
+    setMsg('地形データを解析中...');
+    await sleep(30); // 画面更新のための一息
+
+    const { terrain, nRows, nCols } = parseTerrain(text);
+
+    setMsg('3Dメッシュを生成中...');
+    await sleep(30);
+
+    buildMesh(terrain, nRows, nCols);
+
+    // ローディング非表示
+    const ld = document.getElementById('loading');
+    ld.style.opacity = '0';
+    setTimeout(() => ld.style.display='none', 500);
+
+    animate();
+}
+
+function parseTerrain(text) {
+    const lines = text.split('\n');
+    const terrain = [];
+    for (let j = 0; j < lines.length; j += STRIDE) {
+        const line = lines[j];
+        if (!line || line.trim() === '') continue;
+        const vals = line.split(',');
+        const row = [];
+        for (let i = 0; i < vals.length; i += STRIDE) {
+            const v = vals[i].trim();
+            row.push((v === 'e' || v === '') ? null : parseFloat(v));
+        }
+        terrain.push(row);
+    }
+    const nRows = terrain.length;
+    const nCols = nRows > 0 ? terrain[0].length : 0;
+    console.log('nRows=' + nRows + ' nCols=' + nCols);
+    return { terrain, nRows, nCols };
+}
+
+function buildMesh(terrain, nRows, nCols) {
+    const positions = new Float32Array(nRows * nCols * 3);
+    const colors    = new Float32Array(nRows * nCols * 3);
+    const indexArr  = [];
+
+    const cx = (nCols * SCL) / 2;
+    const cy = (nRows * SCL) / 2;
+
+    for (let j = 0; j < nRows; j++) {
+        for (let i = 0; i < nCols; i++) {
+            const idx = (j * nCols + i) * 3;
+            const z = terrain[j][i];
+            const zVal = (z !== null) ? z / ZSCL : 0;
+
+            positions[idx]   = i * SCL - cx;
+            positions[idx+1] = j * SCL - cy;
+            positions[idx+2] = zVal;
+
+            const [r, g, b] = elevColor(z);
+            colors[idx]   = r / 255;
+            colors[idx+1] = g / 255;
+            colors[idx+2] = b / 255;
+        }
+    }
+
+    for (let j = 0; j < nRows - 1; j++) {
+        for (let i = 0; i < nCols - 1; i++) {
+            const a = j * nCols + i;
+            const b = j * nCols + i + 1;
+            const c = (j+1) * nCols + i;
+            const d = (j+1) * nCols + i + 1;
+            const tl = terrain[j][i],   tr = terrain[j][i+1];
+            const bl = terrain[j+1][i], br = terrain[j+1][i+1];
+
+            if (tl !== null && bl !== null && tr !== null) indexArr.push(a, c, b);
+            if (bl !== null && br !== null && tr !== null) indexArr.push(c, d, b);
+        }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('color',    new THREE.BufferAttribute(colors,    3));
+    geo.setIndex(indexArr);
+    geo.computeVertexNormals();
+
+    const mat = new THREE.MeshPhongMaterial({
+        vertexColors: true,
+        side: THREE.DoubleSide,
+        shininess: 20,
+    });
+
+    const mesh = new THREE.Mesh(geo, mat);
+    // ワイヤーフレームの薄い重ね
+    const wmat = new THREE.MeshBasicMaterial({
+        color: 0x333333, wireframe: true,
+        transparent: true, opacity: 0.08
+    });
+    scene.add(mesh);
+    scene.add(new THREE.Mesh(geo, wmat));
+
+    // カメラ初期位置：地形全体が見える高さ
+    const maxDim = Math.max(nCols * SCL, nRows * SCL);
+    camera.position.set(0, -maxDim * 0.6, maxDim * 0.5);
+    camera.lookAt(0, 0, 0);
+    controls.target.set(0, 0, 0);
+    controls.update();
+}
+
+function elevColor(z) {
+    if (z === null) return [185, 185, 185];
+    if (z < 200) {
+        const t = z / 200;
+        return [lerp(50,110,t), lerp(130,100,t), lerp(55,65,t)];
+    } else if (z < 800) {
+        const t = (z-200) / 600;
+        return [lerp(110,165,t), lerp(100,130,t), lerp(65,90,t)];
+    } else if (z < 2000) {
+        const t = (z-800) / 1200;
+        return [lerp(165,210,t), lerp(130,160,t), lerp(90,130,t)];
     } else {
-        g.style.display = 'none';
-        b.textContent = 'ガイドを表示';
+        const t = Math.min((z-2000)/1000, 1);
+        return [lerp(210,255,t), lerp(160,250,t), lerp(130,255,t)];
     }
 }
-</script>
 
-<script src="sketch.js"></script>
+function lerp(a, b, t) { return a + (b - a) * t; }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function setMsg(txt) { document.getElementById('loading-msg').textContent = txt; }
+
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+});
+
+function toggleGuide() {
+    const g = document.getElementById('guide');
+    const b = document.getElementById('btn-guide');
+    const hidden = g.style.display === 'none';
+    g.style.display = hidden ? 'block' : 'none';
+    b.textContent   = hidden ? 'ガイドを隠す' : 'ガイドを表示';
+}
+
+init().catch(console.error);
+</script>
 </body>
 </html>
