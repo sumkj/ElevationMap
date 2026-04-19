@@ -137,7 +137,7 @@ async function init() {
 }
 
 function parseTerrain(text) {
-    const lines = text.split('\n');
+    const lines = text.trim().split(/\r\n|\r|\n/);  // CR/LF/CRLF すべて対応
     const terrain = [];
     for (let j = 0; j < lines.length; j += STRIDE) {
         const line = lines[j];
