@@ -58,6 +58,20 @@
             cursor:pointer; z-index:10;
         }
         #btn-guide:hover { background:rgba(255,255,255,.12); color:#fff; }
+
+        /* 反転ボタン */
+        #flip-btns {
+            position:fixed; bottom:16px; left:16px;
+            display:flex; gap:8px; z-index:10;
+        }
+        .flip-btn {
+            background:rgba(0,0,0,.65); color:#eee;
+            font-family:monospace; font-size:13px;
+            padding:8px 16px; border-radius:6px;
+            border:1px solid rgba(255,255,255,.2);
+            cursor:pointer; letter-spacing:.05em;
+        }
+        .flip-btn:hover { background:rgba(255,255,255,.12); color:#fff; }
     </style>
 </head>
 <body>
@@ -78,6 +92,12 @@
     ピンチ(2本指) : ズーム
 </div>
 <button id="btn-guide" onclick="toggleGuide()">ガイドを隠す</button>
+
+<!-- 反転ボタン -->
+<div id="flip-btns">
+    <button class="flip-btn" onclick="flipLR()">⇔ 左右反転</button>
+    <button class="flip-btn" onclick="flipUD()">⇕ 上下反転</button>
+</div>
 
 <script>
 // =============================================
@@ -257,6 +277,25 @@ window.addEventListener('resize', () => {
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
 });
+
+// ---- 左右反転（Z軸まわりに180°回転）----
+function flipLR() {
+    const tx = controls.target.x;
+    const ty = controls.target.y;
+    const dx = camera.position.x - tx;
+    const dy = camera.position.y - ty;
+    camera.position.x = tx - dx;
+    camera.position.y = ty - dy;
+    controls.update();
+}
+
+// ---- 上下反転（Z成分を対称移動）----
+function flipUD() {
+    const tz = controls.target.z;
+    const dz = camera.position.z - tz;
+    camera.position.z = tz - dz;
+    controls.update();
+}
 
 function toggleGuide() {
     const g = document.getElementById('guide');
